@@ -35,14 +35,6 @@ custom:
     
 resources:
   Resources:
-    # 設置 Lambda 對應的 CloudWatch Log Group 並保留它
-    MyLambdaLogGroup:
-      Type: AWS::Logs::LogGroup
-      Properties:
-        LogGroupName: "/aws/lambda/${self:service}-${self:provider.stage}-app"
-        RetentionInDays: 7
-      DeletionPolicy: Retain
-
     # 配置 Lambda 別名並設置 canary deployment
     AppLambdaAlias:
       Type: AWS::Lambda::Alias
