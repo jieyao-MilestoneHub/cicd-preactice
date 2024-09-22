@@ -33,7 +33,12 @@ jobs:
 
       - name: Install Serverless CLI
         run: |
-          npm install -g serverless  # 安裝 Serverless CLI
+          npm install -g serverless
+
+      - name: Install Serverless plugins
+        run: |
+          npm install --save serverless-python-requirements
+          npm install --save serverless-wsgi
 
       - name: Deploy to AWS Lambda
         run: |
