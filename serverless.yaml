@@ -1,4 +1,5 @@
-# 使用 Serverless Framework 來自動將 FastAPI 部署到 AWS Lambda 並通過 API Gateway 提供 HTTPS 支援。
+# Using the Serverless Framework to automatically deploy a FastAPI application to AWS Lambda 
+# and provide HTTPS support through API Gateway.
 service: fastapi-lambda-crud
 
 provider:
@@ -7,63 +8,63 @@ provider:
   region: us-east-1
   memorySize: 128
   timeout: 30
-  stage: ${opt:stage, 'dev'}  # 默認使用 'dev'，可通過命令行參數指定 stage
-  versionFunctions: true
+  stage: ${opt:stage, 'dev'}  # Default to 'dev', can specify the stage via command-line option
+  versionFunctions: true      # Enable versioning for the functions
 
 functions:
   app:
-    handler: app/lambda_handler.lambda_handler   # 定義 Lambda 函數的入口點，這裡的 `handler` 指向 `app/lambda_handler.py` 中的 `lambda_handler` 函數，作為 Lambda 的執行入口。
+    handler: app/lambda_handler.lambda_handler   # Defines the Lambda function entry point. This points to the lambda_handler function in the app/lambda_handler.py file.
     events:
-      - http:
-          path: hello
-          method: get
-          cors: true
+      - http:                                   # Specifies an HTTP event to trigger the Lambda function
+          path: hello                           # Set the URL path to '/hello'
+          method: get                           # HTTP method: GET
+          cors: true                            # Enable Cross-Origin Resource Sharing (CORS)
 
     deploymentSettings:
-      type: Linear10PercentEvery1Minute
-      alias: Live
-      preTrafficHook: preHook
-      postTrafficHook: postHook
-      alarms:
-        - FooAlarm           # Logical ID (CloudFormation 模板中定義的唯一標是符)
-        - name: BarAlarm     # 對象 (已存在的 AWS 資源名稱)
+      type: Linear10PercentEvery1Minute         # Gradually deploy the new version, shifting 10% of traffic every minute
+      alias: Live                               # Alias for the new function version
+      preTrafficHook: preHook                   # Function to run before traffic is switched to the new version
+      postTrafficHook: postHook                 # Function to run after traffic is switched to the new version
+      alarms:                                   # Set up CloudWatch alarms to monitor errors
+        - FooAlarm           # Logical ID (A unique identifier defined in the CloudFormation template)
+        - name: BarAlarm     # Resource (Name of an existing AWS resource)
 
   preHook:
-    handler: app.hooks.pre_handler                # 流量切換之前
+    handler: app.hooks.pre_handler                # Function that runs before switching traffic
 
   postHook:
-    handler: app.hooks.post_handler               # 流量切換之後
+    handler: app.hooks.post_handler               # Function that runs after switching traffic
 
 plugins:
-  - serverless-python-requirements            # 引入插件，用於自動打包和處理 Python 依賴項。
-  - serverless-wsgi                           # 引入 `serverless-wsgi` 插件，適配 FastAPI 與 Lambda。
-  - serverless-plugin-canary-deployments
+  - serverless-python-requirements            # Plugin for packaging and handling Python dependencies
+  - serverless-wsgi                           # Plugin for adapting FastAPI to work with AWS Lambda
+  - serverless-plugin-canary-deployments      # Plugin for managing canary deployments (gradual traffic shifting)
 
 custom:
   pythonRequirements:
-    dockerizePip: true                        # 使用 Docker 打包依賴，確保與 Lambda 環境一致。
+    dockerizePip: true                        # Use Docker to package dependencies, ensuring compatibility with the Lambda environment
   wsgi:
-    app: app.main.app                         # 指向 FastAPI app
+    app: app.main.app                         # Points to the FastAPI app in app/main.py
 
 resources:
   Resources:
     FooAlarm:
       Type: AWS::CloudWatch::Alarm
       Properties:
-        AlarmName: LambdaFunctionErrors-FooAlarm-${self:provider.stage}
-        MetricName: Errors
-        Namespace: AWS/Lambda
-        Statistic: Sum
-        Period: 300
-        EvaluationPeriods: 1
-        Threshold: 1
-        ComparisonOperator: GreaterThanOrEqualToThreshold
+        AlarmName: LambdaFunctionErrors-FooAlarm-${self:provider.stage}   # Name for the CloudWatch alarm
+        MetricName: Errors                                                # Metric to monitor (in this case, Lambda errors)
+        Namespace: AWS/Lambda                                             # Namespace for Lambda metrics
+        Statistic: Sum                                                    # Sum of errors
+        Period: 300                                                       # Time period in seconds (5 minutes)
+        EvaluationPeriods: 1                                              # Number of evaluation periods before triggering an alarm
+        Threshold: 1                                                      # Trigger the alarm if there is at least 1 error
+        ComparisonOperator: GreaterThanOrEqualToThreshold                 # Trigger alarm if errors are greater than or equal to the threshold
 
     BarAlarm:
       Type: AWS::CloudWatch::Alarm
       Properties:
-        AlarmName: LambdaFunctionErrors-BarAlarm-${self:provider.stage}
-        MetricName: Errors
+        AlarmName: LambdaFunctionErrors-BarAlarm-${self:provider.stage}   # Name for the second CloudWatch alarm
+        MetricName: Errors                                                # Monitor Lambda errors
         Namespace: AWS/Lambda
         Statistic: Sum
         Period: 300
