@@ -1,7 +1,8 @@
 from fastapi import FastAPI
+from configs.setting import test_text
 
 app = FastAPI()
 
 @app.get("/hello")
 def read_root():
-    return {"message": "CI/CD deployment successfully!"}
+    return {"message": test_text}

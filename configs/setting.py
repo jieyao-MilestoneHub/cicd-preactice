@@ -1,0 +1,1 @@
+test_text = "CI/CD deployment successfully!"
