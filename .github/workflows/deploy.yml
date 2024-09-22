@@ -28,6 +28,7 @@ jobs:
 
       - name: Run tests
         run: |
+          export PYTHONPATH=$PYTHONPATH:$GITHUB_WORKSPACE  # 設置 PYTHONPATH 指向項目根目錄
           pytest
 
       - name: Install Serverless CLI
