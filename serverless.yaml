@@ -41,13 +41,13 @@ resources:
       Properties:
         FunctionName: { "Ref": "AppLambdaFunction" }
         FunctionVersion: { "Fn::GetAtt": ["AppLambdaFunction", "Version"] }
-        Name: ${self:provider.stage}  # 別名會根據 stage 設置為 'dev' 或 'prod'
+        Name: ${self:provider.stage}
         RoutingConfig:
           AdditionalVersionWeights:
             - FunctionVersion: { "Fn::GetAtt": ["AppLambdaFunction", "Version"] }
-              FunctionWeight: 0.1  #  canary deployment，10% 流量指向新版本
+              FunctionWeight: 0.1
 
-    # 配置 CloudWatch Alarm 來監控 Lambda 函數錯誤，並觸發自動回滾
+    # 配置 CloudWatch Alarm 來監控 Lambda 函數錯誤
     FunctionErrorAlarm:
       Type: AWS::CloudWatch::Alarm
       Properties:
@@ -55,27 +55,22 @@ resources:
         MetricName: Errors
         Namespace: AWS/Lambda
         Statistic: Sum
-        Period: 300  # 5 分鐘間隔
+        Period: 300
         EvaluationPeriods: 1
-        Threshold: 1  # 當錯誤數達到 1 時觸發警報
+        Threshold: 1
         ComparisonOperator: GreaterThanOrEqualToThreshold
         AlarmActions:
           - { "Ref": RollbackPolicy }
 
-    # 配置回滾策略
+    # 移除 UsePreviousTemplate，因為它不被支持
     RollbackPolicy:
-      Type: AWS::CloudFormation::Stack
+      Type: AWS::CloudWatch::Alarm
       Properties:
-        StackName: "${self:service}-${self:provider.stage}"
-        UsePreviousTemplate: true
-        StackPolicyDuringUpdateBody: |
-          {
-            "Statement": [
-              {
-                "Effect": "Deny",
-                "Action": "Update:Delete",
-                "Principal": "*",
-                "Resource": "*"
-              }
-            ]
-          }
+        AlarmName: RollbackPolicy-${self:provider.stage}
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 1
+        Threshold: 1
+        ComparisonOperator: GreaterThanOrEqualToThreshold
