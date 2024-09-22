@@ -6,9 +6,10 @@ provider:
   name: aws             # 指定使用 AWS 作為服務提供者（部署到 AWS Lambda）。
   runtime: python3.11   # 設置 Lambda 函數運行的環境，這裡指定 Python 3.11 作為運行時環境。
   region: us-east-1     # 指定部署到 AWS 的哪個區域（這裡是 us-east-1，也就是美國東部區域）。
-  stage: dev            # 默認的 stage 設置為 dev
   memorySize: 128       # 設置 Lambda 函數分配的內存大小（單位為 MB）。這裡設置為 128MB，適合輕量應用。
   timeout: 30           # 設置 Lambda 函數的最大執行時間，這裡設置為 30 秒。如果函數超過此時間，則會被終止。
+  stage: ${opt:stage, 'dev'}  # 默認使用 'dev'，可通過命令行參數指定 stage
+  alias: ${self:provider.stage}  # 根據 stage 動態設置別名
 
 functions:
   app:
@@ -20,6 +21,15 @@ functions:
           path: hello       # 路徑為 /hello
           method: get       # HTTP 方法為 GET
           cors: true        # 啟用 CORS
+    
+    versionFunctions: true  # 啟用版本控制
+    tags:
+      project: cicd-test  # 添加一些標籤，方便管理和過濾
+      owner: Jiao
+
+deploymentSettings:
+  type: Canary10Percent5Minutes  # 使用金絲雀部署，每 5 分鐘轉移 10% 流量到新版本
+  alias: ${self:provider.alias}  # 根據不同的 stage 動態設置 aliasv" 別名
 
 plugins:
   - serverless-python-requirements
