@@ -25,14 +25,14 @@ functions:
       preTrafficHook: preHook
       postTrafficHook: postHook
       alarms:
-        - FooAlarm           # When a string is provided, it expects the alarm Logical ID
-        - name: BarAlarm     # When an object is provided, it expects the alarm name in the name property
+        - FooAlarm           # Logical ID (CloudFormation 模板中定義的唯一標是符)
+        - name: BarAlarm     # 對象 (已存在的 AWS 資源名稱)
 
   preHook:
-    handler: app.hooks.pre_handler                # Pre-deployment hook to run custom logic
+    handler: app.hooks.pre_handler                # 流量切換之前
 
   postHook:
-    handler: app.hooks.post_handler               # Post-deployment hook to run custom logic
+    handler: app.hooks.post_handler               # 流量切換之後
 
 plugins:
   - serverless-python-requirements            # 引入插件，用於自動打包和處理 Python 依賴項。
