@@ -1,0 +1,11 @@
+venv/
+.env
+
+# CI/CD
+
+
+
+# 部屬 AWS 資源
+.serverless
+node_modules/
+package-lock.json

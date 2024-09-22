@@ -1,0 +1,46 @@
+# 使用 Serverless Framework 來自動將 FastAPI 部署到 AWS Lambda 並通過 API Gateway 提供 HTTPS 支援。
+service: fastapi-lambda-crud
+# 定義服務名稱，這是 Serverless 部署應用時所使用的名稱。在 AWS 上的資源會基於這個名稱命名（如 Lambda 函數和 API Gateway）。
+
+provider:
+  name: aws             # 指定使用 AWS 作為服務提供者（部署到 AWS Lambda）。
+  runtime: python3.11   # 設置 Lambda 函數運行的環境，這裡指定 Python 3.11 作為運行時環境。
+  region: us-east-1     # 指定部署到 AWS 的哪個區域（這裡是 us-east-1，也就是美國東部區域）。
+  stage: dev            # 默認的 stage 設置為 dev
+  memorySize: 128       # 設置 Lambda 函數分配的內存大小（單位為 MB）。這裡設置為 128MB，適合輕量應用。
+  timeout: 30           # 設置 Lambda 函數的最大執行時間，這裡設置為 30 秒。如果函數超過此時間，則會被終止。
+
+functions:
+  app:
+    handler: app/lambda_handler.lambda_handler
+    # 定義 Lambda 函數的入口點，這裡的 `handler` 指向 `app/lambda_handler.py` 中的 `lambda_handler` 函數，作為 Lambda 的執行入口。
+
+    events:                 # 事件列表，Lambda 函數的觸發事件配置的開始
+      - http:               # 第一個事件，類型為 HTTP
+          path: hello       # 路徑為 /hello
+          method: get       # HTTP 方法為 GET
+          cors: true        # 啟用 CORS
+
+plugins:
+  - serverless-python-requirements
+  # 引入插件，用於自動打包和處理 Python 依賴項。`serverless-python-requirements` 插件會幫助將應用所需的依賴打包並部署到 Lambda。
+
+  - serverless-wsgi
+  # 引入 `serverless-wsgi` 插件，這個插件用於將 WSGI 應用（如 FastAPI）適配 Lambda，幫助處理 HTTP 請求。
+
+custom:
+  pythonRequirements:
+    dockerizePip: true  # # 在處理 Python 依賴時使用 Docker，特別是當本地環境和 Lambda 運行環境不匹配時（如不同的平台），這可以確保依賴打包與 Lambda 運行環境一致。
+  wsgi:
+    app: app.main.app
+    
+resources:
+  Resources:
+    # 設置 Lambda 對應的 CloudWatch Log Group 並保留它
+    MyLambdaLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: "/aws/lambda/${self:service}-${self:provider.stage}-app" # Log group 名稱
+        RetentionInDays: 7  # 設置保留的天數，這是可選的
+        # retain true 意味著當 stack 被刪除時保留日誌群組
+      DeletionPolicy: Retain
