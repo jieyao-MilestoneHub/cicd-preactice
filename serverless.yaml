@@ -1,57 +1,56 @@
 # 使用 Serverless Framework 來自動將 FastAPI 部署到 AWS Lambda 並通過 API Gateway 提供 HTTPS 支援。
 service: fastapi-lambda-crud
-# 定義服務名稱，這是 Serverless 部署應用時所使用的名稱。在 AWS 上的資源會基於這個名稱命名（如 Lambda 函數和 API Gateway）。
 
 provider:
-  name: aws             # 指定使用 AWS 作為服務提供者（部署到 AWS Lambda）。
-  runtime: python3.11   # 設置 Lambda 函數運行的環境，這裡指定 Python 3.11 作為運行時環境。
-  region: us-east-1     # 指定部署到 AWS 的哪個區域（這裡是 us-east-1，也就是美國東部區域）。
-  memorySize: 128       # 設置 Lambda 函數分配的內存大小（單位為 MB）。這裡設置為 128MB，適合輕量應用。
-  timeout: 30           # 設置 Lambda 函數的最大執行時間，這裡設置為 30 秒。如果函數超過此時間，則會被終止。
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  memorySize: 128
+  timeout: 30
   stage: ${opt:stage, 'dev'}  # 默認使用 'dev'，可通過命令行參數指定 stage
+  versionFunctions: true
 
 functions:
   app:
     handler: app/lambda_handler.lambda_handler   # 定義 Lambda 函數的入口點，這裡的 `handler` 指向 `app/lambda_handler.py` 中的 `lambda_handler` 函數，作為 Lambda 的執行入口。
-    events:                 # 事件列表，Lambda 函數的觸發事件配置的開始
-      - http:               # 第一個事件，類型為 HTTP
-          path: hello       # 路徑為 /hello
-          method: get       # HTTP 方法為 GET
-          cors: true        # 啟用 CORS
+    events:
+      - http:
+          path: hello
+          method: get
+          cors: true
 
-    tags:
-      project: cicd-test  # 添加一些標籤，方便管理和過濾
-      owner: Jiao
+    deploymentSettings:
+      type: Linear10PercentEvery1Minute
+      alias: Live
+      preTrafficHook: preHook
+      postTrafficHook: postHook
+      alarms:
+        - FooAlarm           # When a string is provided, it expects the alarm Logical ID
+        - name: BarAlarm     # When an object is provided, it expects the alarm name in the name property
+
+  preHook:
+    handler: hooks.pre_handler                # Pre-deployment hook to run custom logic
+
+  postHook:
+    handler: hooks.post_handler               # Post-deployment hook to run custom logic
 
 plugins:
-  - serverless-python-requirements  # 引入插件，用於自動打包和處理 Python 依賴項。`serverless-python-requirements` 插件會幫助將應用所需的依賴打包並部署到 Lambda。
-  - serverless-wsgi                 # 引入 `serverless-wsgi` 插件，這個插件用於將 WSGI 應用（如 FastAPI）適配 Lambda，幫助處理 HTTP 請求。
+  - serverless-python-requirements            # 引入插件，用於自動打包和處理 Python 依賴項。
+  - serverless-wsgi                           # 引入 `serverless-wsgi` 插件，適配 FastAPI 與 Lambda。
+  - serverless-plugin-canary-deployments
 
 custom:
   pythonRequirements:
-    dockerizePip: true  # # 在處理 Python 依賴時使用 Docker，特別是當本地環境和 Lambda 運行環境不匹配時（如不同的平台），這可以確保依賴打包與 Lambda 運行環境一致。
+    dockerizePip: true                        # 使用 Docker 打包依賴，確保與 Lambda 環境一致。
   wsgi:
-    app: app.main.app
-    
+    app: app.main.app                         # 指向 FastAPI app
+
 resources:
   Resources:
-    # 配置 Lambda 別名並設置 canary deployment
-    AppLambdaAlias:
-      Type: AWS::Lambda::Alias
-      Properties:
-        FunctionName: { "Ref": "AppLambdaFunction" }
-        FunctionVersion: { "Fn::GetAtt": ["AppLambdaFunction", "Version"] }
-        Name: ${self:provider.stage}
-        RoutingConfig:
-          AdditionalVersionWeights:
-            - FunctionVersion: { "Fn::GetAtt": ["AppLambdaFunction", "Version"] }
-              FunctionWeight: 0.1
-
-    # 配置 CloudWatch Alarm 來監控 Lambda 函數錯誤
-    FunctionErrorAlarm:
+    FooAlarm:
       Type: AWS::CloudWatch::Alarm
       Properties:
-        AlarmName: LambdaFunctionErrors-${self:provider.stage}
+        AlarmName: LambdaFunctionErrors-FooAlarm-${self:provider.stage}
         MetricName: Errors
         Namespace: AWS/Lambda
         Statistic: Sum
@@ -59,14 +58,11 @@ resources:
         EvaluationPeriods: 1
         Threshold: 1
         ComparisonOperator: GreaterThanOrEqualToThreshold
-        AlarmActions:
-          - { "Ref": RollbackPolicy }
 
-    # 移除 UsePreviousTemplate，因為它不被支持
-    RollbackPolicy:
+    BarAlarm:
       Type: AWS::CloudWatch::Alarm
       Properties:
-        AlarmName: RollbackPolicy-${self:provider.stage}
+        AlarmName: LambdaFunctionErrors-BarAlarm-${self:provider.stage}
         MetricName: Errors
         Namespace: AWS/Lambda
         Statistic: Sum

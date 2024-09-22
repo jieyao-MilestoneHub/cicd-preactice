@@ -56,6 +56,7 @@ jobs:
         run: |
           npm install --save serverless-python-requirements
           npm install --save serverless-wsgi
+          npm i --save-dev serverless-plugin-canary-deployments
 
       - name: Deploy to AWS Lambda
         run: |
