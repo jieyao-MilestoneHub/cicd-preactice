@@ -21,6 +21,16 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Ensure requirements.txt is UTF-8 without BOM
+        run: |
+          if file requirements.txt | grep -q "with BOM"; then
+            echo "Converting requirements.txt to UTF-8 without BOM"
+            mv requirements.txt requirements.txt.bak
+            iconv -f utf-8 -t utf-8 -c requirements.txt.bak > requirements.txt
+          else
+            echo "requirements.txt is already in correct format"
+          fi
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
