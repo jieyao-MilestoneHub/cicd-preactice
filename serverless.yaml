@@ -29,10 +29,10 @@ functions:
         - name: BarAlarm     # When an object is provided, it expects the alarm name in the name property
 
   preHook:
-    handler: hooks.pre_handler                # Pre-deployment hook to run custom logic
+    handler: app.hooks.pre_handler                # Pre-deployment hook to run custom logic
 
   postHook:
-    handler: hooks.post_handler               # Post-deployment hook to run custom logic
+    handler: app.hooks.post_handler               # Post-deployment hook to run custom logic
 
 plugins:
   - serverless-python-requirements            # 引入插件，用於自動打包和處理 Python 依賴項。
