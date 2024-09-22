@@ -9,34 +9,23 @@ provider:
   memorySize: 128       # 設置 Lambda 函數分配的內存大小（單位為 MB）。這裡設置為 128MB，適合輕量應用。
   timeout: 30           # 設置 Lambda 函數的最大執行時間，這裡設置為 30 秒。如果函數超過此時間，則會被終止。
   stage: ${opt:stage, 'dev'}  # 默認使用 'dev'，可通過命令行參數指定 stage
-  alias: ${self:provider.stage}  # 根據 stage 動態設置別名
 
 functions:
   app:
-    handler: app/lambda_handler.lambda_handler
-    # 定義 Lambda 函數的入口點，這裡的 `handler` 指向 `app/lambda_handler.py` 中的 `lambda_handler` 函數，作為 Lambda 的執行入口。
-
+    handler: app/lambda_handler.lambda_handler   # 定義 Lambda 函數的入口點，這裡的 `handler` 指向 `app/lambda_handler.py` 中的 `lambda_handler` 函數，作為 Lambda 的執行入口。
     events:                 # 事件列表，Lambda 函數的觸發事件配置的開始
       - http:               # 第一個事件，類型為 HTTP
           path: hello       # 路徑為 /hello
           method: get       # HTTP 方法為 GET
           cors: true        # 啟用 CORS
-    
-    versionFunctions: true  # 啟用版本控制
+
     tags:
       project: cicd-test  # 添加一些標籤，方便管理和過濾
       owner: Jiao
 
-deploymentSettings:
-  type: Canary10Percent5Minutes  # 使用金絲雀部署，每 5 分鐘轉移 10% 流量到新版本
-  alias: ${self:provider.alias}  # 根據不同的 stage 動態設置 aliasv" 別名
-
 plugins:
-  - serverless-python-requirements
-  # 引入插件，用於自動打包和處理 Python 依賴項。`serverless-python-requirements` 插件會幫助將應用所需的依賴打包並部署到 Lambda。
-
-  - serverless-wsgi
-  # 引入 `serverless-wsgi` 插件，這個插件用於將 WSGI 應用（如 FastAPI）適配 Lambda，幫助處理 HTTP 請求。
+  - serverless-python-requirements  # 引入插件，用於自動打包和處理 Python 依賴項。`serverless-python-requirements` 插件會幫助將應用所需的依賴打包並部署到 Lambda。
+  - serverless-wsgi                 # 引入 `serverless-wsgi` 插件，這個插件用於將 WSGI 應用（如 FastAPI）適配 Lambda，幫助處理 HTTP 請求。
 
 custom:
   pythonRequirements:
@@ -50,7 +39,51 @@ resources:
     MyLambdaLogGroup:
       Type: AWS::Logs::LogGroup
       Properties:
-        LogGroupName: "/aws/lambda/${self:service}-${self:provider.stage}-app" # Log group 名稱
-        RetentionInDays: 7  # 設置保留的天數，這是可選的
-        # retain true 意味著當 stack 被刪除時保留日誌群組
+        LogGroupName: "/aws/lambda/${self:service}-${self:provider.stage}-app"
+        RetentionInDays: 7
       DeletionPolicy: Retain
+
+    # 配置 Lambda 別名並設置 canary deployment
+    AppLambdaAlias:
+      Type: AWS::Lambda::Alias
+      Properties:
+        FunctionName: { "Ref": "AppLambdaFunction" }
+        FunctionVersion: { "Fn::GetAtt": ["AppLambdaFunction", "Version"] }
+        Name: ${self:provider.stage}  # 別名會根據 stage 設置為 'dev' 或 'prod'
+        RoutingConfig:
+          AdditionalVersionWeights:
+            - FunctionVersion: { "Fn::GetAtt": ["AppLambdaFunction", "Version"] }
+              FunctionWeight: 0.1  #  canary deployment，10% 流量指向新版本
+
+    # 配置 CloudWatch Alarm 來監控 Lambda 函數錯誤，並觸發自動回滾
+    FunctionErrorAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: LambdaFunctionErrors-${self:provider.stage}
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Statistic: Sum
+        Period: 300  # 5 分鐘間隔
+        EvaluationPeriods: 1
+        Threshold: 1  # 當錯誤數達到 1 時觸發警報
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        AlarmActions:
+          - { "Ref": RollbackPolicy }
+
+    # 配置回滾策略
+    RollbackPolicy:
+      Type: AWS::CloudFormation::Stack
+      Properties:
+        StackName: "${self:service}-${self:provider.stage}"
+        UsePreviousTemplate: true
+        StackPolicyDuringUpdateBody: |
+          {
+            "Statement": [
+              {
+                "Effect": "Deny",
+                "Action": "Update:Delete",
+                "Principal": "*",
+                "Resource": "*"
+              }
+            ]
+          }

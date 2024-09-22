@@ -33,6 +33,11 @@ jobs:
             echo "requirements.txt is already in correct format"
           fi
 
+      - name: Convert line endings to Unix format
+        run: |
+          sudo apt-get install -y dos2unix
+          dos2unix requirements.txt
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
